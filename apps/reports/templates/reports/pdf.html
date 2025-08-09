@@ -1,0 +1,65 @@
+{% load formatting %}
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    @page {
+      size: {% if landscape %}A4 landscape{% else %}A4 portrait{% endif %};
+      margin: 12mm;
+    }
+    body { font-family: DejaVu Sans, Arial, Helvetica, sans-serif; font-size: 11px; }
+    h1 { font-size: 16px; margin: 0 0 8px 0; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { border: 1px solid #444; padding: 4px; }
+    th { background: #eee; }
+    .right { text-align: right; }
+    .muted { color: #666; font-size: 10px; }
+  </style>
+</head>
+<body>
+  <h1>Transactions Report</h1>
+  <p class="muted">
+    Generated: {{ generated_at|date:"d/m/Y H:i" }} |
+    Layout: {% if landscape %}Landscape{% else %}Portrait{% endif %}<br>
+    Filters: {{ filters.urlencode }}
+  </p>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Date</th>
+        <th>Entity ID</th>
+        <th>Entity Name</th>
+        <th>Type</th>
+        <th>Currency</th>
+        <th class="right">Amount</th>
+        <th class="right">Rate</th>
+        <th class="right">MMK</th>
+        <th>Purpose</th>
+        <th>Location</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for t in rows %}
+        <tr>
+          <td>{{ t.date|date:"d/m/Y" }}</td>
+          <td>{{ t.entity.custom_id }}</td>
+          <td>{{ t.entity.name }}</td>
+          <td>{{ t.entity.get_type_display }}</td>
+          <td>{{ t.currency.code }}</td>
+          <td class="right">{{ t.amount|money:2 }}</td>
+          <td class="right">{{ t.exchange_rate }}</td>
+          <td class="right">{{ t.converted_amount_mmk|money:2 }}</td>
+          <td>{{ t.designated_purpose }}</td>
+          <td>{{ t.entity.location }}</td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="10">No results.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <p><strong>Total MMK:</strong> {{ totals.total_mmk|money:2 }}</p>
+</body>
+</html>

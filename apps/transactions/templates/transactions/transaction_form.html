@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}{{ title }}{% endblock %}
+{% block content %}
+<h1 class="mb-3">{{ title }}</h1>
+<form method="post" enctype="multipart/form-data">
+  {% csrf_token %}
+  <div class="row g-3">
+    <div class="col-md-3">
+      <label class="form-label">Date</label>
+      {{ form.date }}
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">Entity Type</label>
+      {{ form.entity_type }}
+    </div>
+    <div class="col-md-6">
+      <label class="form-label">Entity</label>
+      {{ form.entity }}
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">Currency</label>
+      {{ form.currency }}
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">Amount</label>
+      {{ form.amount }}
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">Exchange Rate (→ MMK)</label>
+      {{ form.exchange_rate }}
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">Designated Purpose</label>
+      {{ form.designated_purpose }}
+    </div>
+    <div class="col-12">
+      <label class="form-label">Notes</label>
+      {{ form.notes }}
+    </div>
+  </div>
+
+  <hr class="my-4">
+
+  <h5>Attachments</h5>
+  {{ formset.management_form }}
+  <div id="attachments">
+    {% for f in formset.forms %}
+      <div class="row g-2 align-items-center mb-2">
+        <div class="col-md-6">
+          {{ f.file }}
+          {% if f.instance.pk %}
+            <small class="text-muted d-block mt-1">Existing: {{ f.instance.file.name }}</small>
+          {% endif %}
+        </div>
+        <div class="col-auto">
+          {% if f.instance.pk %}
+            <label class="form-check-label me-1">Delete</label>{{ f.DELETE }}
+          {% endif %}
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+
+  <div class="mt-3">
+    <button class="btn btn-success">Save</button>
+    <a href="{% url 'transactions:index' %}" class="btn btn-secondary">Cancel</a>
+  </div>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  // Init Select2 for Entity with live type filter
+  function initEntitySelect() {
+    const type = $('#entity-type').val();
+    $('#entity-select').select2({
+      width: '100%',
+      ajax: {
+        delay: 200,
+        url: "{% url 'entities:autocomplete' %}",
+        data: params => ({ q: params.term, type: type }),
+        processResults: data => data
+      },
+      placeholder: 'Search entity by ID or name',
+      allowClear: true
+    });
+  }
+
+  $(function(){
+    initEntitySelect();
+    $('#entity-type').on('change', function(){
+      // Reset and re-init with new type filter
+      $('#entity-select').val(null).trigger('change');
+      $('#entity-select').select2('destroy');
+      initEntitySelect();
+    });
+  });
+</script>
+{% endblock %}

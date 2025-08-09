@@ -1,0 +1,179 @@
+{% extends "base.html" %}
+{% load formatting %}
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<h1 class="mb-3">Dashboard</h1>
+
+<form method="get" class="card card-body mb-4">
+  <div class="row g-3">
+    <!-- NEW: Entity autocomplete -->
+    <div class="col-md-3">
+      <label class="form-label">Entity (autocomplete)</label>
+      {{ form.entity }}
+    </div>
+
+    <div class="col-md-2">
+      <label class="form-label">Entity ID</label>
+      {{ form.custom_id }}
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">Entity Name</label>
+      {{ form.entity_name }}
+    </div>
+
+    <div class="col-md-2">
+      <label class="form-label">Date From</label>
+      {{ form.date_from }}
+    </div>
+    <div class="col-md-2">
+      <label class="form-label">Date To</label>
+      {{ form.date_to }}
+    </div>
+    <div class="col-md-2">
+      <label class="form-label">Location</label>
+      {{ form.location }}
+    </div>
+    <div class="col-md-1">
+      <label class="form-label">Currency</label>
+      {{ form.currency }}
+    </div>
+    <div class="col-md-2">
+      <label class="form-label">Entity Type</label>
+      {{ form.entity_type }}
+    </div>
+    <div class="col-md-2">
+      <label class="form-label">Designated Purpose</label>
+      {{ form.designated_purpose }}
+    </div>
+  </div>
+  <div class="mt-3 d-flex gap-2">
+    <button class="btn btn-primary">Apply Filters</button>
+    <a class="btn btn-outline-secondary" href="{% url 'dashboard:index' %}">Reset</a>
+  </div>
+</form>
+
+<div class="row g-3 mb-4">
+  <div class="col-md-4">
+    <div class="card border-success">
+      <div class="card-body">
+        <h6 class="text-muted mb-1">Total Donated (MMK)</h6>
+        <div class="h3 mb-0">{{ total_donated|money }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card border-danger">
+      <div class="card-body">
+        <h6 class="text-muted mb-1">Total Distributed (MMK)</h6>
+        <div class="h3 mb-0">{{ total_distributed|money }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card border-primary">
+      <div class="card-body">
+        <h6 class="text-muted mb-1">Remaining (MMK)</h6>
+        <div class="h3 mb-0">{{ remaining|money }}</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<h5 class="mb-2">Summary by Currency (filtered)</h5>
+<table class="table table-sm table-bordered align-middle">
+  <thead class="table-light">
+    <tr>
+      <th>Currency</th>
+      <th class="text-end">Donated (MMK)</th>
+      <th class="text-end">Distributed (MMK)</th>
+      <th class="text-end">Remaining (MMK)</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for row in summary_by_currency %}
+      <tr>
+        <td>{{ row.currency }}</td>
+        <td class="text-end">{{ row.donated|money }}</td>
+        <td class="text-end">{{ row.distributed|money }}</td>
+        <td class="text-end">{{ row.remaining|money }}</td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="4">No data for current filters.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<h5 class="mt-4 mb-2">Recent Transactions</h5>
+<div class="table-responsive">
+<table class="table table-hover table-bordered align-middle">
+  <thead class="table-light">
+    <tr>
+      <th>Date</th>
+      <th>Entity</th>
+      <th>Currency</th>
+      <th class="text-end">Amount</th>
+      <th class="text-end">Rate</th>
+      <th class="text-end">MMK</th>
+      <th>Purpose</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for t in recent %}
+      <tr>
+        <td>{{ t.date|date:"d/m/Y" }}</td>
+        <td>{{ t.entity.custom_id }} · {{ t.entity.name }} · {{ t.entity.get_type_display }}</td>
+        <td>{{ t.currency.code }}</td>
+        <td class="text-end">{{ t.amount|money:2 }}</td>
+        <td class="text-end">{{ t.exchange_rate }}</td>
+        <td class="text-end">{{ t.converted_amount_mmk|money:2 }}</td>
+        <td>{{ t.designated_purpose }}</td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="7">No transactions yet.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  // Initialize Select2 on the Dashboard entity select, respecting Entity Type filter
+  function initDashboardEntitySelect() {
+    const type = $('#entity-type').val(); // from the form's entity_type select
+    $('#entity-select').select2({
+      width: '100%',
+      ajax: {
+        delay: 200,
+        url: "{% url 'entities:autocomplete' %}",
+        data: params => ({ q: params.term, type: type }),
+        processResults: data => data
+      },
+      placeholder: 'Search entity by ID or name',
+      allowClear: true
+    });
+  }
+
+  $(function() {
+    initDashboardEntitySelect();
+
+    // When Entity Type changes, reinitialize the entity select with the new type filter
+    $('#entity-type').on('change', function(){
+      $('#entity-select').val(null).trigger('change');
+      $('#entity-select').select2('destroy');
+      initDashboardEntitySelect();
+    });
+
+    // Preselect if an entity id was already chosen (server renders a blank <select>, so this is optional)
+    // If you want to show current selection text after reload, we'd need to inject the option.
+    // Example (uncomment and replace IDs): 
+    // const selectedId = '{{ form.data.entity|default_if_none:"" }}';
+    // const selectedText = 'D0001 · Acme Foundation · Donor';
+    // if (selectedId && selectedText) {
+    //   const option = new Option(selectedText, selectedId, true, true);
+    //   $('#entity-select').append(option).trigger('change');
+    // }
+  });
+</script>
+{% endblock %}

@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% load formatting %}
+{% block title %}Transactions{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h1>Transactions</h1>
+  <a href="{% url 'transactions:add' %}" class="btn btn-primary">Add Transaction</a>
+</div>
+
+<div class="table-responsive">
+<table class="table table-bordered table-hover align-middle">
+  <thead class="table-light">
+    <tr>
+      <th>Date</th>
+      <th>Entity</th>
+      <th>Currency</th>
+      <th class="text-end">Amount</th>
+      <th class="text-end">Rate</th>
+      <th class="text-end">MMK</th>
+      <th>Purpose</th>
+      <th>Files</th>
+      <th>Actions</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for t in page_obj.object_list %}
+      <tr>
+        <td>{{ t.date|date:"d/m/Y" }}</td>
+        <td>{{ t.entity.custom_id }} · {{ t.entity.name }} · {{ t.entity.get_type_display }}</td>
+        <td>{{ t.currency.code }}</td>
+        <td class="text-end">{{ t.amount|money:2 }}</td>
+        <td class="text-end">{{ t.exchange_rate }}</td>
+        <td class="text-end">{{ t.converted_amount_mmk|money:2 }}</td>
+        <td>{{ t.designated_purpose }}</td>
+        <td>
+          {% if t.attachments.all %}
+            {% for a in t.attachments.all %}
+              <div><a href="{{ a.file.url }}" target="_blank" rel="noopener">Download</a></div>
+            {% empty %}
+              <span class="text-muted">—</span>
+            {% endfor %}
+          {% else %}
+            <span class="text-muted">—</span>
+          {% endif %}
+        </td>
+        <td class="nowrap">
+          <a class="btn btn-sm btn-secondary" href="{% url 'transactions:edit' t.id %}">Edit</a>
+          <a class="btn btn-sm btn-danger" href="{% url 'transactions:delete' t.id %}" onclick="return confirm('Delete this transaction?')">Delete</a>
+        </td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="9">No transactions yet.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+
+<nav>
+  <ul class="pagination">
+    {% if page_obj.has_previous %}
+      <li class="page-item"><a class="page-link" href="?page=1">« First</a></li>
+      <li class="page-item"><a class="page-link" href="?page={{ page_obj.previous_page_number }}">‹ Prev</a></li>
+    {% else %}
+      <li class="page-item disabled"><span class="page-link">« First</span></li>
+      <li class="page-item disabled"><span class="page-link">‹ Prev</span></li>
+    {% endif %}
+
+    <li class="page-item disabled"><span class="page-link">Page {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span></li>
+
+    {% if page_obj.has_next %}
+      <li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}">Next ›</a></li>
+      <li class="page-item"><a class="page-link" href="?page={{ page_obj.paginator.num_pages }}">Last »</a></li>
+    {% else %}
+      <li class="page-item disabled"><span class="page-link">Next ›</span></li>
+      <li class="page-item disabled"><span class="page-link">Last »</span></li>
+    {% endif %}
+  </ul>
+</nav>
+{% endblock %}

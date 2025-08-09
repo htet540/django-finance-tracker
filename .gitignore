@@ -1,10 +1,21 @@
-venv/
+# Byte-compiled / cache
 __pycache__/
-*.pyc
+*.py[cod]
 *.pyo
 *.pyd
-*.sqlite3
+*.pyc
+
+# Virtual env
+venv/
+myenv/
 .env
-staticfiles/
+
+# Django
+db.sqlite3
 media/
+staticfiles/
+
+# IDE
+.vscode/
+.idea/
 .DS_Store

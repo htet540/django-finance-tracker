@@ -1,46 +1,70 @@
-cat > config/settings/prod.py << 'PY'
-from .base import *
+# config/settings/prod.py
+from .base import *  # noqa
 import os
-import dj_database_url
 
+# --- Core ---
 DEBUG = False
+# Reuse base SECRET_KEY unless an env override is provided
+SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", SECRET_KEY)
 
-# Hosts
-ALLOWED_HOSTS = [h.strip() for h in os.getenv("DJANGO_ALLOWED_HOSTS", "").split(",") if h.strip()]
+# --- Hosts / CSRF ---
+# Prefer explicit list via env; otherwise fall back to Render hostname if present
+_allowed = os.getenv("DJANGO_ALLOWED_HOSTS")
+if _allowed:
+    ALLOWED_HOSTS = [h.strip() for h in _allowed.split(",") if h.strip()]
+else:
+    render_host = os.getenv("RENDER_EXTERNAL_HOSTNAME")
+    if render_host:
+        ALLOWED_HOSTS = [render_host, ".onrender.com"]
+    else:
+        ALLOWED_HOSTS = [".onrender.com", "127.0.0.1", "localhost"]
 
-# Security (can be tweaked via env)
-SECURE_SSL_REDIRECT = bool(int(os.getenv("DJANGO_SSL_REDIRECT", "1")))
+# CSRF trusted origins: allow explicit env or derive from ALLOWED_HOSTS
+_csrf = os.getenv("DJANGO_CSRF_TRUSTED_ORIGINS")
+if _csrf:
+    CSRF_TRUSTED_ORIGINS = [o.strip() for o in _csrf.split(",") if o.strip()]
+else:
+    # Build https://<host> entries (skip wildcard-only hosts here)
+    CSRF_TRUSTED_ORIGINS = [
+        f"https://{h}"
+        for h in ALLOWED_HOSTS
+        if h and not h.startswith(".") and h != "localhost" and not h.startswith("127.")
+    ]
+    # Always include Render wildcard
+    CSRF_TRUSTED_ORIGINS += ["https://*.onrender.com"]
+
+# --- Static files (WhiteNoise) ---
+# Insert WhiteNoise right after SecurityMiddleware if not already present
+if "whitenoise.middleware.WhiteNoiseMiddleware" not in MIDDLEWARE:
+    try:
+        i = MIDDLEWARE.index("django.middleware.security.SecurityMiddleware") + 1
+    except ValueError:
+        i = 0
+    MIDDLEWARE = (
+        MIDDLEWARE[:i]
+        + ["whitenoise.middleware.WhiteNoiseMiddleware"]
+        + MIDDLEWARE[i:]
+    )
+
+STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
+
+# --- Security ---
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+SECURE_SSL_REDIRECT = True
+
 SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
-SECURE_HSTS_SECONDS = int(os.getenv("DJANGO_HSTS_SECONDS", "31536000"))
+
+SECURE_HSTS_SECONDS = int(os.getenv("SECURE_HSTS_SECONDS", "31536000"))  # 1 year
 SECURE_HSTS_INCLUDE_SUBDOMAINS = True
 SECURE_HSTS_PRELOAD = True
 
-# Behind proxy
-USE_X_FORWARDED_HOST = True
-SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"
 
-# Static/Media
-STATIC_ROOT = BASE_DIR / "staticfiles"
-STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
-
-# Database: prefer DATABASE_URL
-DATABASE_URL = os.getenv("DATABASE_URL")
-if DATABASE_URL:
-    DATABASES = {
-        "default": dj_database_url.config(default=DATABASE_URL, conn_max_age=600, ssl_require=False)
-    }
-elif os.getenv("DB_NAME"):
-    DATABASES = {
-        "default": {
-            "ENGINE": "django.db.backends.postgresql",
-            "NAME": os.getenv("DB_NAME"),
-            "USER": os.getenv("DB_USER"),
-            "PASSWORD": os.getenv("DB_PASSWORD"),
-            "HOST": os.getenv("DB_HOST", "127.0.0.1"),
-            "PORT": os.getenv("DB_PORT", "5432"),
-        }
-    }
-# else: fallback to base.py (sqlite)
-
-PY
+# --- Logging ---
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "handlers": {"console": {"class": "logging.StreamHandler"}},
+    "root": {"handlers": ["console"], "level": os.getenv("DJANGO_LOG_LEVEL", "INFO")},
+}

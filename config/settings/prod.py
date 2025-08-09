@@ -1,32 +1,36 @@
+cat > config/settings/prod.py << 'PY'
 from .base import *
 import os
+import dj_database_url
 
-# --- Core prod flags ---
 DEBUG = False
 
-# Hosts (REQUIRED in prod)
+# Hosts
 ALLOWED_HOSTS = [h.strip() for h in os.getenv("DJANGO_ALLOWED_HOSTS", "").split(",") if h.strip()]
 
-# --- Security (tweak as needed) ---
-SECURE_SSL_REDIRECT = bool(int(os.getenv("DJANGO_SSL_REDIRECT", "1")))  # set 0 if your proxy terminates TLS
+# Security (can be tweaked via env)
+SECURE_SSL_REDIRECT = bool(int(os.getenv("DJANGO_SSL_REDIRECT", "1")))
 SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
-SECURE_HSTS_SECONDS = int(os.getenv("DJANGO_HSTS_SECONDS", "31536000"))  # 1 year
+SECURE_HSTS_SECONDS = int(os.getenv("DJANGO_HSTS_SECONDS", "31536000"))
 SECURE_HSTS_INCLUDE_SUBDOMAINS = True
 SECURE_HSTS_PRELOAD = True
 
-# If behind a proxy/load balancer
+# Behind proxy
 USE_X_FORWARDED_HOST = True
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
-# --- Static/Media ---
-# In prod, collect static files here: python manage.py collectstatic
+# Static/Media
 STATIC_ROOT = BASE_DIR / "staticfiles"
-# MEDIA_ROOT already defined in base.py -> BASE_DIR / "media"
+STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
-# --- Database ---
-# If env DB_NAME exists, assume Postgres; else fallback to SQLite (not recommended in prod).
-if os.getenv("DB_NAME"):
+# Database: prefer DATABASE_URL
+DATABASE_URL = os.getenv("DATABASE_URL")
+if DATABASE_URL:
+    DATABASES = {
+        "default": dj_database_url.config(default=DATABASE_URL, conn_max_age=600, ssl_require=False)
+    }
+elif os.getenv("DB_NAME"):
     DATABASES = {
         "default": {
             "ENGINE": "django.db.backends.postgresql",
@@ -37,4 +41,6 @@ if os.getenv("DB_NAME"):
             "PORT": os.getenv("DB_PORT", "5432"),
         }
     }
-# else: keep DATABASES from base.py (SQLite) — OK for quick demos, not real prod.
+# else: fallback to base.py (sqlite)
+
+PY
